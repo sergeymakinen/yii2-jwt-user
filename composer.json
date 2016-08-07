@@ -1,0 +1,29 @@
+{
+    "name": "sergeymakinen/yii2-jwt-user",
+    "description": "JWT (JSON Web Token) User component for Yii 2",
+    "keywords": ["yii2-jwt-user", "yii2", "yii", "jwt", "json web token", "json", "web", "token", "user"],
+    "type": "yii2-extension",
+    "license": "MIT",
+    "support": {
+        "issues": "https://github.com/sergeymakinen/yii2-jwt-user/issues?state=open",
+        "forum": "https://gitter.im/sergeymakinen/yii2-jwt-user",
+        "source": "https://github.com/sergeymakinen/yii2-jwt-user"
+    },
+    "authors": [
+        {
+            "name": "Sergey Makinen",
+            "email": "sergey@makinen.ru",
+            "homepage": "https://makinen.ru"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "yiisoft/yii2": "2.0.*",
+        "firebase/php-jwt": "^4.0",
+    },
+    "autoload": {
+        "classmap": [
+            "User.php"
+        ]
+    }
+}
