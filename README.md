@@ -6,7 +6,7 @@ JWT ([JSON Web Token](https://jwt.io)) identification for Yii 2 [User](http://ww
 
 ## Installation
 
-The preferred way to install this extension is through [composer](http://getcomposer.org/download/).
+The preferred way to install this extension is through [composer](https://getcomposer.org/download/).
 
 Either run
 
