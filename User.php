@@ -50,7 +50,7 @@ class User extends BaseUser
          */
         $class = $this->identityClass;
         $identity = $class::findIdentity($value['jti']);
-        if ($identity === null) {
+        if (!isset($identity)) {
             return;
         } elseif (!$identity instanceof IdentityInterface) {
             throw new InvalidValueException("$class::findIdentity() must return an object implementing IdentityInterface.");
@@ -63,7 +63,7 @@ class User extends BaseUser
         }
         if ($this->beforeLogin($identity, true, $duration)) {
             $this->switchIdentity($identity, $this->autoRenewCookie ? $duration : 0);
-            $ip = \Yii::$app->request->userIP;
+            $ip = \Yii::$app->getRequest()->getUserIP();
             \Yii::info("User '{$value['jti']}' logged in from $ip via cookie.", __METHOD__);
             $this->afterLogin($identity, true, $duration);
         }
@@ -75,7 +75,7 @@ class User extends BaseUser
     protected function renewIdentityCookie()
     {
         try {
-            $value = (array) JWT::decode(\Yii::$app->request->cookies->getValue($this->identityCookie['name']), $this->token, ['HS256']);
+            $value = (array) JWT::decode(\Yii::$app->getRequest()->getCookies()->getValue($this->identityCookie['name']), $this->token, ['HS256']);
         } catch (\Exception $e) {
             return;
         }
@@ -86,7 +86,7 @@ class User extends BaseUser
         $cookie = new Cookie($this->identityCookie);
         $cookie->expire = $value['exp'];
         $cookie->value = JWT::encode($value, $this->token, 'HS256');
-        \Yii::$app->response->cookies->add($cookie);
+        \Yii::$app->getResponse()->getCookies()->add($cookie);
     }
 
     /**
@@ -96,8 +96,8 @@ class User extends BaseUser
     {
         $now = time();
         $value = [
-            'iss' => \Yii::$app->request->hostInfo,
-            'aud' => \Yii::$app->request->hostInfo,
+            'iss' => \Yii::$app->getRequest()->getHostInfo(),
+            'aud' => \Yii::$app->getRequest()->getHostInfo(),
             'nbf' => $now,
             'iat' => $now,
             'jti' => $identity->getId()
@@ -110,6 +110,6 @@ class User extends BaseUser
             $cookie->expire = $value['exp'];
         }
         $cookie->value = JWT::encode($value, $this->token, 'HS256');
-        \Yii::$app->response->cookies->add($cookie);
+        \Yii::$app->getResponse()->getCookies()->add($cookie);
     }
 }
