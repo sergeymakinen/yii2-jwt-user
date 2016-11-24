@@ -106,7 +106,7 @@ class User extends \yii\web\User
     }
 
     /**
-     * Tries to read, verify, validate and return a JWT token stored in the identity cookie.
+     * Tries to read, verify, validate and return a JWT claims stored in the identity cookie.
      *
      * @return array|false
      * @since 1.1
@@ -150,7 +150,6 @@ class User extends \yii\web\User
      * @param mixed $id
      * @param string $issuer
      * @param string $audience
-     *
      * @since 1.1
      */
     protected function setToken($issuedAt, $notBefore, $expiresAt, $id, $issuer = null, $audience = null)
@@ -201,6 +200,7 @@ class User extends \yii\web\User
         if ($object instanceof Builder) {
             $object->setIssuer(isset($issuer) ? $issuer : \Yii::$app->getRequest()->getHostInfo());
         }
-        return $object->setAudience(isset($audience) ? $audience : $this->getAudience());
+        $object->setAudience(isset($audience) ? $audience : $this->getAudience());
+        return $object;
     }
 }
