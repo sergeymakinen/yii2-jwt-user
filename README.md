@@ -4,6 +4,8 @@ JWT ([JSON Web Token](https://jwt.io)) identification for Yii 2 [User](http://ww
 
 [![Code Quality](https://img.shields.io/scrutinizer/g/sergeymakinen/yii2-jwt-user.svg?style=flat-square)](https://scrutinizer-ci.com/g/sergeymakinen/yii2-jwt-user) [![Packagist Version](https://img.shields.io/packagist/v/sergeymakinen/yii2-jwt-user.svg?style=flat-square)](https://packagist.org/packages/sergeymakinen/yii2-jwt-user) [![Total Downloads](https://img.shields.io/packagist/dt/sergeymakinen/yii2-jwt-user.svg?style=flat-square)](https://packagist.org/packages/sergeymakinen/yii2-jwt-user) [![Software License](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square)](LICENSE)
 
+[![SensioLabsInsight](https://insight.sensiolabs.com/projects/edadf97f-95ba-4998-b832-ed30ca6e1014/big.png)](https://insight.sensiolabs.com/projects/edadf97f-95ba-4998-b832-ed30ca6e1014)
+
 ## Installation
 
 The preferred way to install this extension is through [composer](https://getcomposer.org/download/).
