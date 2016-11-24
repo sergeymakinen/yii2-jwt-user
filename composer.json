@@ -18,8 +18,8 @@
     ],
     "minimum-stability": "dev",
     "require": {
-        "yiisoft/yii2": "~2.0.1",
-        "firebase/php-jwt": "^4.0"
+        "lcobucci/jwt": "~3.2.0",
+        "yiisoft/yii2": "~2.0.1"
     },
     "autoload": {
         "classmap": [
