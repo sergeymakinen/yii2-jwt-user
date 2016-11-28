@@ -4,8 +4,8 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
         "This file is @generated automatically"
     ],
-    "hash": "61f21707b62fa01f54424aa4e4f45aa2",
-    "content-hash": "79d1d070f6345a7e7c1eb63b074fd5a0",
+    "hash": "92383c43acbbd49eeedbdf07bbab3b54",
+    "content-hash": "d78dc5e1c0bbe778eedc0cdbcedf09d7",
     "packages": [
         {
             "name": "bower-asset/jquery",
@@ -527,12 +527,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/phar-io/manifest.git",
-                "reference": "0a049cd7414d1f73ae00a062a2b58fb0ec5a6d57"
+                "reference": "106a1ba8091f094042cb2bd33467f57c904bf646"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phar-io/manifest/zipball/0a049cd7414d1f73ae00a062a2b58fb0ec5a6d57",
-                "reference": "0a049cd7414d1f73ae00a062a2b58fb0ec5a6d57",
+                "url": "https://api.github.com/repos/phar-io/manifest/zipball/106a1ba8091f094042cb2bd33467f57c904bf646",
+                "reference": "106a1ba8091f094042cb2bd33467f57c904bf646",
                 "shasum": ""
             },
             "require": {
@@ -573,7 +573,7 @@
                 }
             ],
             "description": "Component for reading phar.io manifest information from a PHP Archive (PHAR)",
-            "time": "2016-11-27 14:20:50"
+            "time": "2016-11-28 09:14:44"
         },
         {
             "name": "phpdocumentor/reflection-common",
@@ -1794,6 +1794,8 @@
     "stability-flags": [],
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": [],
+    "platform": {
+        "php": ">=5.5"
+    },
     "platform-dev": []
 }
