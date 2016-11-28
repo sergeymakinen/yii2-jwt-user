@@ -68,7 +68,7 @@ class UserTest extends TestCase
                             $result
                         );
                     } else {
-                        $this->assertSame(false, $result);
+                        $this->assertFalse($result);
                     }
                 }
             }

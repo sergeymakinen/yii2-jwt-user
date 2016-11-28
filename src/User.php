@@ -1,6 +1,6 @@
 <?php
 /**
- * JWT powered User for Yii 2
+ * JWT powered User for Yii 2.
  *
  * @see       https://github.com/sergeymakinen/yii2-jwt-user
  * @copyright Copyright (c) 2016 Sergey Makinen (https://makinen.ru)
