@@ -24,7 +24,7 @@
     },
     "require-dev": {
         "firebase/php-jwt": "^4.0",
-        "phpunit/phpunit": "^4.8|^5.6"
+        "phpunit/phpunit": "^4.8 || ^5.6"
     },
     "config": {
         "process-timeout": 1800
