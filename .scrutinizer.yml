@@ -1,16 +1,18 @@
 build:
     environment:
         php:
-            version: 5.6.16
+            version: 5.6
     dependencies:
         before:
-            - sudo composer self-update
             - composer config -g repositories.asset-packagist composer https://asset-packagist.org
 imports:
     - php
 tools:
-    php_sim: false
+    external_code_coverage: true
     php_cpd: false
+    php_sim: false
 filter:
     excluded_paths:
+        - docs/*
+        - tests/*
         - vendor/*

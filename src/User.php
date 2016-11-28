@@ -108,10 +108,13 @@ class User extends \yii\web\User
     /**
      * Tries to read, verify, validate and return a JWT claims stored in the identity cookie.
      *
+     * @param int $currentTime
+     * @param string $audience
+     *
      * @return array|false
      * @since 1.1
      */
-    protected function getTokenClaims()
+    protected function getTokenClaims($currentTime = null, $audience = null)
     {
         $jwt = \Yii::$app->getRequest()->getCookies()->getValue($this->identityCookie['name']);
         if (!isset($jwt)) {
@@ -124,7 +127,7 @@ class User extends \yii\web\User
                 throw new InvalidValueException('Invalid signature');
             }
 
-            if (!$token->validate($this->initClaims(new ValidationData()))) {
+            if (!$token->validate($this->initClaims(new ValidationData($currentTime), null, $audience))) {
                 throw new InvalidValueException('Invalid claims');
             }
             $claims = [];
