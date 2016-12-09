@@ -44,7 +44,7 @@ class User extends \yii\web\User
     public $audience;
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     protected function loginByCookie()
     {
@@ -77,7 +77,7 @@ class User extends \yii\web\User
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     protected function renewIdentityCookie()
     {
@@ -92,7 +92,7 @@ class User extends \yii\web\User
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     protected function sendIdentityCookie($identity, $duration)
     {
