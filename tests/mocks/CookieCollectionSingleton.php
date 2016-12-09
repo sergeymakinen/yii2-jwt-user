@@ -1,6 +1,6 @@
 <?php
 
-namespace sergeymakinen\tests\mocks;
+namespace sergeymakinen\tests\web\mocks;
 
 use yii\web\CookieCollection;
 

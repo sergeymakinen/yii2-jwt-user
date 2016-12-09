@@ -1,24 +1,35 @@
 <?php
 
-namespace sergeymakinen\tests;
+namespace sergeymakinen\tests\web;
 
 use Firebase\JWT\JWT;
-use sergeymakinen\tests\mocks\CookieCollectionSingleton;
-use sergeymakinen\tests\mocks\TestIdentity;
+use sergeymakinen\tests\web\mocks\CookieCollectionSingleton;
+use sergeymakinen\tests\web\mocks\TestIdentity;
 use sergeymakinen\web\User;
 use yii\web\Cookie;
 
 class UserTest extends TestCase
 {
-    protected $testTokens = [
-        // 'valid', 'both|reference|non-reference', 'iat', 'nbf', 'exp', 'jti', 'iss', 'aud'
-        [true, 'both', 0, 0, 3600, 'jti', 'iss', 'aud'],
-        [false, 'both', 3600, 0, 3600, 'jti', 'iss', 'aud'],                    // iss > now
-        [false, 'both', 0, 61, 3600, 'jti', 'iss', 'aud'],                      // nbf > now
-        [false, 'both', 0, 0, 59, 'jti', 'iss', 'aud'],                         // exp < now
-        [true, 'reference', 0, 0, 3600, 'jti', 'iss', ['aud', 'aud1']],         // aud mismatch
-        [false, 'nonReference', 0, 0, 3600, 'jti', 'iss', ['aud', 'aud1']],     // aud mismatch
-    ];
+    protected function setUp()
+    {
+        parent::setUp();
+        $this->createWebApplication([
+            'components' => [
+                'user' => [
+                    'class' => 'sergeymakinen\web\User',
+                    'identityClass' => 'sergeymakinen\tests\web\mocks\TestIdentity',
+                    'token' => 'foobar',
+                ],
+                'request' => [
+                    'class' => 'sergeymakinen\tests\web\mocks\TestRequest',
+                ],
+                'response' => [
+                    'class' => 'sergeymakinen\tests\web\mocks\TestResponse',
+                ],
+            ],
+        ]);
+        CookieCollectionSingleton::getInstance()->removeAll();
+    }
 
     public function testGetAudience()
     {
@@ -31,7 +42,24 @@ class UserTest extends TestCase
         $this->assertEquals('bar', $this->getAudience());
     }
 
-    public function testGetTokenClaimsAndSetToken()
+    public function testTokensProvider()
+    {
+        return [
+            // 'valid', 'both|reference|non-reference', 'iat', 'nbf', 'exp', 'jti', 'iss', 'aud'
+            [[true, 'both', 0, 0, 3600, 'jti', 'iss', 'aud']],
+            [[false, 'both', 3600, 0, 3600, 'jti', 'iss', 'aud']],                    // iss > now
+            [[false, 'both', 0, 61, 3600, 'jti', 'iss', 'aud']],                      // nbf > now
+            [[false, 'both', 0, 0, 59, 'jti', 'iss', 'aud']],                         // exp < now
+            [[true, 'reference', 0, 0, 3600, 'jti', 'iss', ['aud', 'aud1']]],         // aud mismatch
+            [[false, 'nonReference', 0, 0, 3600, 'jti', 'iss', ['aud', 'aud1']]],     // aud mismatch
+        ];
+    }
+
+    /**
+     * @dataProvider testTokensProvider
+     * @param array $token
+     */
+    public function testGetTokenClaimsAndSetToken(array $token)
     {
         $scopes = [
             'both' => [true, false],
@@ -39,37 +67,35 @@ class UserTest extends TestCase
             'nonReference' => [false],
         ];
         $now = time();
-        foreach ($this->testTokens as $token) {
-            $valid = array_shift($token);
-            $scope = $scopes[array_shift($token)];
-            foreach ([0, 1, 2] as $claim) {
-                $token[$claim] = $now + $token[$claim];
-            }
-            foreach ($scope as $reference) {
-                foreach (['normal', 'wrongKey', 'notSet'] as $mode) {
-                    CookieCollectionSingleton::getInstance()->removeAll();
-                    if ($mode !== 'notSet') {
-                        $this->setToken($reference, $this->prepareTestToken($token, 0));
-                    }
-                    if ($mode === 'wrongKey') {
-                        $oldKey = $this->getUser()->token;
-                        $this->getUser()->token = 'invalidKey';
-                    }
-                    $result = $this->getTokenClaims(
-                        count($scope) === 1 ? $reference : !$reference, $now + 60, $this->prepareTestToken($token, 1)[5]
+        $valid = array_shift($token);
+        $scope = $scopes[array_shift($token)];
+        foreach ([0, 1, 2] as $claim) {
+            $token[$claim] = $now + $token[$claim];
+        }
+        foreach ($scope as $reference) {
+            foreach (['normal', 'wrongKey', 'notSet'] as $mode) {
+                CookieCollectionSingleton::getInstance()->removeAll();
+                if ($mode !== 'notSet') {
+                    $this->setToken($reference, $this->prepareTestToken($token, 0));
+                }
+                if ($mode === 'wrongKey') {
+                    $oldKey = $this->getUser()->token;
+                    $this->getUser()->token = 'invalidKey';
+                }
+                $result = $this->getTokenClaims(
+                    count($scope) === 1 ? $reference : !$reference, $now + 60, $this->prepareTestToken($token, 1)[5]
+                );
+                if ($mode === 'wrongKey') {
+                    /** @noinspection PhpUndefinedVariableInspection */
+                    $this->getUser()->token = $oldKey;
+                }
+                if ($mode === 'normal' && $valid) {
+                    $this->assertEquals(
+                        array_combine(['iat', 'nbf', 'exp', 'jti', 'iss', 'aud'], $this->prepareTestToken($token, 0)),
+                        $result
                     );
-                    if ($mode === 'wrongKey') {
-                        /** @noinspection PhpUndefinedVariableInspection */
-                        $this->getUser()->token = $oldKey;
-                    }
-                    if ($mode === 'normal' && $valid) {
-                        $this->assertEquals(
-                            array_combine(['iat', 'nbf', 'exp', 'jti', 'iss', 'aud'], $this->prepareTestToken($token, 0)),
-                            $result
-                        );
-                    } else {
-                        $this->assertFalse($result);
-                    }
+                } else {
+                    $this->assertFalse($result);
                 }
             }
         }
@@ -234,26 +260,5 @@ class UserTest extends TestCase
             $newToken[] = $value;
         }
         return $newToken;
-    }
-
-    protected function setUp()
-    {
-        parent::setUp();
-        $this->createWebApplication([
-            'components' => [
-                'user' => [
-                    'class' => 'sergeymakinen\web\User',
-                    'identityClass' => 'sergeymakinen\tests\mocks\TestIdentity',
-                    'token' => 'foobar',
-                ],
-                'request' => [
-                    'class' => 'sergeymakinen\tests\mocks\TestRequest',
-                ],
-                'response' => [
-                    'class' => 'sergeymakinen\tests\mocks\TestResponse',
-                ],
-            ],
-        ]);
-        CookieCollectionSingleton::getInstance()->removeAll();
     }
 }

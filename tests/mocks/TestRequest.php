@@ -1,13 +1,13 @@
 <?php
 
-namespace sergeymakinen\tests\mocks;
+namespace sergeymakinen\tests\web\mocks;
 
 use yii\web\Request;
 
 class TestRequest extends Request
 {
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function getCookies()
     {
