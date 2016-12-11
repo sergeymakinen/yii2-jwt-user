@@ -12,13 +12,13 @@ The preferred way to install this extension is through [composer](https://getcom
 
 Either run
 
-```
-php composer.phar require sergeymakinen/yii2-jwt-user "^1.0"
+```bash
+composer require "sergeymakinen/yii2-jwt-user:^1.0"
 ```
 
 or add
 
-```
+```json
 "sergeymakinen/yii2-jwt-user": "^1.0"
 ```
 
@@ -29,14 +29,16 @@ to the require section of your `composer.json` file.
 Set the following Yii 2 configuration parameters:
 
 ```php
-'components' => [
-    'user' => [
-        'class' => 'sergeymakinen\web\User',
-        'identityClass' => 'app\models\User',
-        'enableAutoLogin' => true, // Optional
-        'token' => 'random key (CHANGE IT!)',
+[
+    'components' => [
+        'user' => [
+            'class' => 'sergeymakinen\web\User',
+            'identityClass' => 'app\models\User',
+            'enableAutoLogin' => true, // Optional
+            'token' => 'random key (CHANGE IT!)',
+        ],
     ],
-],
+]
 ```
 
 Also set `identityClass` to whatever your identity class name is and change `token` to some *random* value and make sure it's *secret*.
