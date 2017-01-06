@@ -1,54 +1,62 @@
 sudo: false
 git:
-    depth: 1
+  depth: 1
 language: php
 matrix:
-    include:
-        - php: 5.5
-          env: COMPOSER_LOWEST="--prefer-lowest"
-        - php: 5.5
-        - php: 5.6
-          env: COMPOSER_LOWEST="--prefer-lowest"
-        - php: 5.6
-          env: PHPUNIT_COVERAGE="--coverage-clover=coverage.xml"
-        - php: 7.0
-          env: COMPOSER_LOWEST="--prefer-lowest"
-        - php: 7.0
-        - php: 7.1
-          env: COMPOSER_LOWEST="--prefer-lowest"
-        - php: 7.1
-        - php: nightly
-          env: COMPOSER_LOWEST="--prefer-lowest"
-        - php: nightly
-    allow_failures:
-        - php: nightly
-          env: COMPOSER_LOWEST="--prefer-lowest"
-        - php: nightly
+  fast_finish: true
+  include:
+  - php: 5.5
+    env: COMPOSER_LOWEST="--prefer-lowest"
+  - php: 5.5
+  - php: 5.6
+    env: COMPOSER_LOWEST="--prefer-lowest"
+  - php: 5.6
+    env: PHPUNIT_COVERAGE="--coverage-clover=coverage.xml"
+  - php: 7.0
+    env: COMPOSER_LOWEST="--prefer-lowest"
+  - php: 7.0
+  - php: 7.1
+    env: COMPOSER_LOWEST="--prefer-lowest"
+  - php: 7.1
+  - php: nightly
+    env: COMPOSER_LOWEST="--prefer-lowest"
+  - php: nightly
+  allow_failures:
+  - php: nightly
+    env: COMPOSER_LOWEST="--prefer-lowest"
+  - php: nightly
 cache:
-    directories:
-        - vendor
+  directories:
+  - "$HOME/.composer/cache"
 before_install:
-    - stty cols 120
-    - |
-      if [ -z "$PHPUNIT_COVERAGE" ]; then
-          phpenv config-rm xdebug.ini || echo "xdebug not available"
-      fi
+- stty cols 120
+- |
+  if [ -z "$PHPUNIT_COVERAGE" ]; then
+      phpenv config-rm xdebug.ini || echo "xdebug not available"
+  fi
 install:
-    - composer self-update
-    - composer config -g repositories.asset-packagist composer https://asset-packagist.org
-    - travis_retry composer update --no-interaction --prefer-stable --prefer-dist $COMPOSER_LOWEST
-    - composer show
+- composer self-update
+- composer config -g repositories.asset-packagist composer https://asset-packagist.org
+- travis_retry composer update --no-interaction --prefer-stable --prefer-dist $COMPOSER_LOWEST
+- composer show
 script:
-    - vendor/bin/phpunit $PHPUNIT_COVERAGE
+- vendor/bin/phpunit $PHPUNIT_COVERAGE
 after_success:
-    - |
-      if [ -n "$PHPUNIT_COVERAGE" ]; then
-          travis_retry wget https://codecov.io/bash
-          bash ./bash
-      fi
+- |
+  if [ -n "$PHPUNIT_COVERAGE" ]; then
+      travis_retry wget https://codecov.io/bash
+      bash ./bash
+  fi
 after_script:
-    - |
-      if [ -n "$PHPUNIT_COVERAGE" ]; then
-          travis_retry wget https://scrutinizer-ci.com/ocular.phar
-          php ocular.phar code-coverage:upload --format=php-clover coverage.xml
-      fi
+- |
+  if [ -n "$PHPUNIT_COVERAGE" ]; then
+      travis_retry wget https://scrutinizer-ci.com/ocular.phar
+      php ocular.phar code-coverage:upload --format=php-clover coverage.xml
+  fi
+notifications:
+  on_success: change
+  on_failure: always
+  on_pull_requests: false
+  slack:
+    rooms:
+      secure: v0GqRWpdZ46lpz13I9fm1F5EhQIFZHCahz56olVNWHSK0t1vwzc+e8ZzedHzEVoP+Kj1gypXiiqYwnPBAYcPIlNgXetseuc1sgIpQSLZrvMsdC2ZbfWKa21w28BSMMXprV8uDWfEAhWueFxD8tlVMPbTBDMAcjNCV/BkUURCHR/jDZDIXtO/MGCW6qNsdfx3hvRe0itxs6GgKdQBpuoT0INw5Zb8LZofsPba3g4fHY77Of0R1TpV5+23Cg0wBVaAeA+D9ELi9oymGWhReQVI1/KnaVoSkY2u9qsnpNl2HAjlHCik3rfPiUscYjNRrpTpo+QIyEYyFzR/xrGA0yPTWeOFPLbbhVBjW3S4pVmkEXXTxeCJdZr3rUlLyEg/tPWF8NcwcLY4lPypLWSRiMC+sgUGyBG/28eQa9aHSJMKWxyY9BYEuCFUazDYoY10eFbUxcT82Hm9Pxddxu8lvSnvgQz/58SaLfEw/A9SlpnWG1ZaCxcuAUsczaElO+N0730e4YgoH8VJQedsCf0WopfzU3/QpHHdQvA1CGbRe8Cjbt4+uQ6n36BSIE84aSACeVbH/exTTnhSonsI10AufGMKgot9ZENjpy0IgJTlflFjkUejs36mAfIWp5apNQ6+aQiVVDRVMjZXmEmr+l2l0NSzpk5w4eRmtxUHFYMuyCf7w2M=
