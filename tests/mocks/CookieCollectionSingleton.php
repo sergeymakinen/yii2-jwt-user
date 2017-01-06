@@ -1,10 +1,11 @@
 <?php
 
-namespace sergeymakinen\tests\web\mocks;
+namespace sergeymakinen\yii\jwtuser\tests\mocks;
 
+use yii\base\Object;
 use yii\web\CookieCollection;
 
-class CookieCollectionSingleton
+class CookieCollectionSingleton extends Object
 {
     /**
      * @var CookieCollection

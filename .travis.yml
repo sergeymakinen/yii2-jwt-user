@@ -2,15 +2,28 @@ sudo: false
 git:
     depth: 1
 language: php
-php:
-    - 5.5
-    - 7.0
-    - 7.1
 matrix:
     include:
+        - php: 5.5
+          env: COMPOSER_LOWEST="--prefer-lowest"
+        - php: 5.5
         - php: 5.6
-          env:
-              - PHPUNIT_COVERAGE="--coverage-clover=coverage.xml"
+          env: COMPOSER_LOWEST="--prefer-lowest"
+        - php: 5.6
+          env: PHPUNIT_COVERAGE="--coverage-clover=coverage.xml"
+        - php: 7.0
+          env: COMPOSER_LOWEST="--prefer-lowest"
+        - php: 7.0
+        - php: 7.1
+          env: COMPOSER_LOWEST="--prefer-lowest"
+        - php: 7.1
+        - php: nightly
+          env: COMPOSER_LOWEST="--prefer-lowest"
+        - php: nightly
+    allow_failures:
+        - php: nightly
+          env: COMPOSER_LOWEST="--prefer-lowest"
+        - php: nightly
 cache:
     directories:
         - vendor
@@ -18,12 +31,12 @@ before_install:
     - stty cols 120
     - |
       if [ -z "$PHPUNIT_COVERAGE" ]; then
-          phpenv config-rm xdebug.ini
+          phpenv config-rm xdebug.ini || echo "xdebug not available"
       fi
 install:
     - composer self-update
     - composer config -g repositories.asset-packagist composer https://asset-packagist.org
-    - travis_retry composer update --no-interaction --prefer-stable --prefer-dist
+    - travis_retry composer update --no-interaction --prefer-stable --prefer-dist $COMPOSER_LOWEST
     - composer show
 script:
     - vendor/bin/phpunit $PHPUNIT_COVERAGE

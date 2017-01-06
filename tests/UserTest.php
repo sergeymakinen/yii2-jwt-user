@@ -1,11 +1,13 @@
 <?php
 
-namespace sergeymakinen\tests\web;
+namespace sergeymakinen\yii\jwtuser\tests;
 
 use Firebase\JWT\JWT;
-use sergeymakinen\tests\web\mocks\CookieCollectionSingleton;
-use sergeymakinen\tests\web\mocks\TestIdentity;
-use sergeymakinen\web\User;
+use sergeymakinen\yii\jwtuser\tests\mocks\CookieCollectionSingleton;
+use sergeymakinen\yii\jwtuser\tests\mocks\TestIdentity;
+use sergeymakinen\yii\jwtuser\tests\mocks\TestRequest;
+use sergeymakinen\yii\jwtuser\tests\mocks\TestResponse;
+use sergeymakinen\yii\jwtuser\User;
 use yii\web\Cookie;
 
 class UserTest extends TestCase
@@ -16,15 +18,15 @@ class UserTest extends TestCase
         $this->createWebApplication([
             'components' => [
                 'user' => [
-                    'class' => 'sergeymakinen\web\User',
-                    'identityClass' => 'sergeymakinen\tests\web\mocks\TestIdentity',
+                    'class' => User::className(),
+                    'identityClass' => TestIdentity::className(),
                     'token' => 'foobar',
                 ],
                 'request' => [
-                    'class' => 'sergeymakinen\tests\web\mocks\TestRequest',
+                    'class' => TestRequest::className(),
                 ],
                 'response' => [
-                    'class' => 'sergeymakinen\tests\web\mocks\TestResponse',
+                    'class' => TestResponse::className(),
                 ],
             ],
         ]);
@@ -57,6 +59,7 @@ class UserTest extends TestCase
 
     /**
      * @dataProvider testTokensProvider
+     *
      * @param array $token
      */
     public function testGetTokenClaimsAndSetToken(array $token)
@@ -192,7 +195,6 @@ class UserTest extends TestCase
      * @param $reference
      * @param int $currentTime
      * @param string $audience
-     *
      * @return array|false
      */
     protected function getTokenClaims($reference, $currentTime = null, $audience = null)
@@ -247,7 +249,6 @@ class UserTest extends TestCase
     /**
      * @param array $token
      * @param int $index
-     *
      * @return array
      */
     protected function prepareTestToken(array $token, $index)

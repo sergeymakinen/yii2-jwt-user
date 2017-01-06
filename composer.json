@@ -19,21 +19,21 @@
     "minimum-stability": "dev",
     "require": {
         "php": ">=5.5",
-        "lcobucci/jwt": "~3.2.0",
-        "yiisoft/yii2": "~2.0.1"
+        "yiisoft/yii2": "~2.0.2",
+        "lcobucci/jwt": "~3.2.0"
     },
     "require-dev": {
-        "sergeymakinen/yii2-tests": "^1.0",
+        "sergeymakinen/yii2-tests": "^2.0",
         "firebase/php-jwt": "^4.0"
     },
     "autoload": {
-        "classmap": [
-            "src/User.php"
-        ]
+        "psr-4": {
+            "sergeymakinen\\yii\\jwtuser\\": "src"
+        }
     },
     "autoload-dev": {
         "psr-4": {
-            "sergeymakinen\\tests\\web\\": "tests"
+            "sergeymakinen\\yii\\jwtuser\\tests\\": "tests"
         }
     }
 }

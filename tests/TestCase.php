@@ -1,7 +1,7 @@
 <?php
 
-namespace sergeymakinen\tests\web;
+namespace sergeymakinen\yii\jwtuser\tests;
 
-abstract class TestCase extends \sergeymakinen\tests\TestCase
+abstract class TestCase extends \sergeymakinen\yii\tests\TestCase
 {
 }

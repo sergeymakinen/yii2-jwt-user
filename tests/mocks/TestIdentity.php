@@ -1,14 +1,15 @@
 <?php
 
-namespace sergeymakinen\tests\web\mocks;
+namespace sergeymakinen\yii\jwtuser\tests\mocks;
 
 use yii\base\InvalidCallException;
+use yii\base\Object;
 use yii\web\IdentityInterface;
 
-class TestIdentity implements IdentityInterface
+class TestIdentity extends Object implements IdentityInterface
 {
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     public static function findIdentity($id)
     {
@@ -22,7 +23,7 @@ class TestIdentity implements IdentityInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     public static function findIdentityByAccessToken($token, $type = null)
     {
@@ -30,7 +31,7 @@ class TestIdentity implements IdentityInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     public function getId()
     {
@@ -38,7 +39,7 @@ class TestIdentity implements IdentityInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     public function getAuthKey()
     {
@@ -46,7 +47,7 @@ class TestIdentity implements IdentityInterface
     }
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     public function validateAuthKey($authKey)
     {

@@ -1,13 +1,13 @@
 <?php
 /**
- * JWT powered User for Yii 2.
+ * JWT powered User for Yii 2
  *
  * @see       https://github.com/sergeymakinen/yii2-jwt-user
  * @copyright Copyright (c) 2016 Sergey Makinen (https://makinen.ru)
- * @license   https://github.com/sergeymakinen/yii2-jwt-user/blob/master/LICENSE The MIT License
+ * @license   https://github.com/sergeymakinen/yii2-jwt-user/blob/master/LICENSE MIT License
  */
 
-namespace sergeymakinen\web;
+namespace sergeymakinen\yii\jwtuser;
 
 use Lcobucci\JWT\Builder;
 use Lcobucci\JWT\Parser;
@@ -27,24 +27,20 @@ use yii\web\IdentityInterface;
 class User extends \yii\web\User
 {
     /**
-     * JWT sign key. Must be random and secret.
-     *
-     * @var string
+     * @var string JWT sign key. Must be random and secret.
      * @see https://tools.ietf.org/html/rfc7519#section-11
      */
     public $token;
 
     /**
-     * JWT audience claim ("aud").
-     *
-     * @var \Closure|string
+     * @var \Closure|string JWT audience claim ("aud").
      * @see https://tools.ietf.org/html/rfc7519#section-4.1.3
      * @since 1.1
      */
     public $audience;
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     protected function loginByCookie()
     {
@@ -77,7 +73,7 @@ class User extends \yii\web\User
     }
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     protected function renewIdentityCookie()
     {
@@ -92,7 +88,7 @@ class User extends \yii\web\User
     }
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     protected function sendIdentityCookie($identity, $duration)
     {
@@ -107,10 +103,8 @@ class User extends \yii\web\User
 
     /**
      * Tries to read, verify, validate and return a JWT claims stored in the identity cookie.
-     *
      * @param int $currentTime
      * @param string $audience
-     *
      * @return array|false
      * @since 1.1
      */
@@ -146,7 +140,6 @@ class User extends \yii\web\User
 
     /**
      * Writes a JWT token into the identity cookie.
-     *
      * @param int $issuedAt
      * @param int $notBefore
      * @param int $expiresAt
@@ -174,7 +167,6 @@ class User extends \yii\web\User
 
     /**
      * Returns a JWT audience claim ("aud").
-     *
      * @return string
      * @since 1.1
      */
@@ -191,11 +183,9 @@ class User extends \yii\web\User
 
     /**
      * Returns Builder/ValidationData with "iss" and "aud" claims set.
-     *
      * @param Builder|ValidationData $object
      * @param string $issuer
      * @param string $audience
-     *
      * @return Builder|ValidationData
      */
     private function initClaims($object, $issuer = null, $audience = null)
