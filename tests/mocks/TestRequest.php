@@ -11,6 +11,6 @@ class TestRequest extends Request
      */
     public function getCookies()
     {
-        return CookieCollectionSingleton::getInstance();
+        return TestCookieCollection::getInstance();
     }
 }

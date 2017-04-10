@@ -5,7 +5,7 @@ namespace sergeymakinen\yii\jwtuser\tests\mocks;
 use yii\base\Object;
 use yii\web\CookieCollection;
 
-class CookieCollectionSingleton extends Object
+class TestCookieCollection extends Object
 {
     /**
      * @var CookieCollection
@@ -17,7 +17,7 @@ class CookieCollectionSingleton extends Object
      */
     public static function getInstance()
     {
-        if (!isset(self::$_instance)) {
+        if (self::$_instance === null) {
             self::$_instance = new CookieCollection();
         }
         return self::$_instance;

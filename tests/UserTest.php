@@ -3,176 +3,315 @@
 namespace sergeymakinen\yii\jwtuser\tests;
 
 use Firebase\JWT\JWT;
-use sergeymakinen\yii\jwtuser\tests\mocks\CookieCollectionSingleton;
+use Lcobucci\JWT\Token;
+use sergeymakinen\yii\jwtuser\tests\mocks\TestCookieCollection;
+use sergeymakinen\yii\jwtuser\tests\mocks\TestGlobals;
 use sergeymakinen\yii\jwtuser\tests\mocks\TestIdentity;
 use sergeymakinen\yii\jwtuser\tests\mocks\TestRequest;
 use sergeymakinen\yii\jwtuser\tests\mocks\TestResponse;
 use sergeymakinen\yii\jwtuser\User;
+use yii\helpers\ArrayHelper;
 use yii\web\Cookie;
 
+/**
+ * @coversDefaultClass \sergeymakinen\yii\jwtuser\User
+ * @covers ::<private>
+ */
 class UserTest extends TestCase
 {
-    protected function setUp()
-    {
-        parent::setUp();
-        $this->createWebApplication([
-            'components' => [
-                'user' => [
-                    'class' => User::className(),
-                    'identityClass' => TestIdentity::className(),
-                    'token' => 'foobar',
-                ],
-                'request' => [
-                    'class' => TestRequest::className(),
-                ],
-                'response' => [
-                    'class' => TestResponse::className(),
-                ],
-            ],
-        ]);
-        CookieCollectionSingleton::getInstance()->removeAll();
-    }
+    protected static $successfulSets = [
+        '[false,{"useAuthKey":false,"appendAuthKey":false},"kfoo","kfoo",0,0,3600,"jti_foo","jti_bar","iss",{},"aud",{}]',
+        '[false,{"useAuthKey":false,"appendAuthKey":false},"kfoo","kfoo",0,0,3600,"jti_foo","jti_bar","iss",{},"http:\/\/example.com",null]',
+        '[false,{"useAuthKey":false,"appendAuthKey":false},"kfoo","kfoo",0,0,3600,"jti_foo","jti_bar","http:\/\/example.com",null,"aud",{}]',
+        '[false,{"useAuthKey":false,"appendAuthKey":false},"kfoo","kfoo",0,0,3600,"jti_foo","jti_bar","http:\/\/example.com",null,"http:\/\/example.com",null]',
+    ];
 
-    public function testGetAudience()
+    public function claimsProvider()
     {
-        $this->assertEquals(\Yii::$app->request->hostInfo, $this->getAudience());
-        $this->getUser()->audience = 'foo';
-        $this->assertEquals('foo', $this->getAudience());
-        $this->getUser()->audience = function () {
-            return 'bar';
+        $configs = [
+            [true, [
+                'useAuthKey' => false,
+                'appendAuthKey' => false,
+            ]],
+            [true, [
+                'useAuthKey' => true,
+                'appendAuthKey' => false,
+            ]],
+            [true, [
+                'useAuthKey' => true,
+                'appendAuthKey' => true,
+            ]],
+        ];
+        $keys = [
+            [true, 'kfoo', 'kfoo'],
+            [false, 'kfoo', 'kbar'],
+        ];
+        $dateClaims = [
+            // 'valid', 'iat', 'nbf', 'exp'
+            [true, 0, 0, 3600],
+            [true, 0, 0, 3600],
+
+            [false, 3600, 0, 3600],                     // iss > now
+            [false, 0, 61, 3600],                       // nbf > now
+            [false, 0, 0, 59],                          // exp < now
+        ];
+        $jtis = [
+            [true, 'jti_foo', 'jti_foo'],
+            [false, 'jti_foo', 'jti_bar'],
+        ];
+        $issuerClosure = function () {
+            return 'iss';
         };
-        $this->assertEquals('bar', $this->getAudience());
-    }
-
-    public function testTokensProvider()
-    {
-        return [
-            // 'valid', 'both|reference|non-reference', 'iat', 'nbf', 'exp', 'jti', 'iss', 'aud'
-            [[true, 'both', 0, 0, 3600, 'jti', 'iss', 'aud']],
-            [[false, 'both', 3600, 0, 3600, 'jti', 'iss', 'aud']],                    // iss > now
-            [[false, 'both', 0, 61, 3600, 'jti', 'iss', 'aud']],                      // nbf > now
-            [[false, 'both', 0, 0, 59, 'jti', 'iss', 'aud']],                         // exp < now
-            [[true, 'reference', 0, 0, 3600, 'jti', 'iss', ['aud', 'aud1']]],         // aud mismatch
-            [[false, 'nonReference', 0, 0, 3600, 'jti', 'iss', ['aud', 'aud1']]],     // aud mismatch
+        $issuers = [
+            [true, 'iss', $issuerClosure],
+            [true, 'http://example.com', null],
+            [false, 'issfoo', 'iss'],
+            [false, 'issfoo', $issuerClosure],
         ];
-    }
-
-    /**
-     * @dataProvider testTokensProvider
-     *
-     * @param array $token
-     */
-    public function testGetTokenClaimsAndSetToken(array $token)
-    {
-        $scopes = [
-            'both' => [true, false],
-            'reference' => [true],
-            'nonReference' => [false],
+        $audienceClosure = function () {
+            return 'aud';
+        };
+        $audiences = [
+            [true, 'aud', $audienceClosure],
+            [true, 'http://example.com', null],
+            [false, 'audbaz', 'aud'],
+            [false, 'audbaz', $audienceClosure],
         ];
-        $now = time();
-        $valid = array_shift($token);
-        $scope = $scopes[array_shift($token)];
-        foreach ([0, 1, 2] as $claim) {
-            $token[$claim] = $now + $token[$claim];
-        }
-        foreach ($scope as $reference) {
-            foreach (['normal', 'wrongKey', 'notSet'] as $mode) {
-                CookieCollectionSingleton::getInstance()->removeAll();
-                if ($mode !== 'notSet') {
-                    $this->setToken($reference, $this->prepareTestToken($token, 0));
-                }
-                if ($mode === 'wrongKey') {
-                    $oldKey = $this->getUser()->token;
-                    $this->getUser()->token = 'invalidKey';
-                }
-                $result = $this->getTokenClaims(
-                    count($scope) === 1 ? $reference : !$reference, $now + 60, $this->prepareTestToken($token, 1)[5]
-                );
-                if ($mode === 'wrongKey') {
-                    /** @noinspection PhpUndefinedVariableInspection */
-                    $this->getUser()->token = $oldKey;
-                }
-                if ($mode === 'normal' && $valid) {
-                    $this->assertEquals(
-                        array_combine(['iat', 'nbf', 'exp', 'jti', 'iss', 'aud'], $this->prepareTestToken($token, 0)),
-                        $result
-                    );
-                } else {
-                    $this->assertFalse($result);
+        $claims = [[]];
+        foreach ([$configs, $keys, $dateClaims, $jtis, $issuers, $audiences] as $sets) {
+            $newClaims = [];
+            foreach ($claims as $claim) {
+                $valid = array_shift($claim);
+                foreach ($sets as $set) {
+                    $setValid = array_shift($set);
+                    $newValid = ($valid !== null ? $valid : true) && $setValid;
+                    $newClaim = array_merge([$newValid], $claim, $set);
+                    $newClaims[json_encode($newClaim)] = $newClaim;
                 }
             }
+            $claims = $newClaims;
         }
-    }
-
-    public function testLoginByCookieOk()
-    {
-        $now = time();
-        $this->getUser()->autoRenewCookie = false;
-        $this->assertTrue($this->getUser()->isGuest);
-        $this->setToken(false, [$now, $now, $now + 3600, 'jti', 'iss', $this->getAudience()]);
-        $this->invokeInaccessibleMethod($this->getUser(), 'loginByCookie');
-        $this->assertFalse($this->getUser()->isGuest);
-        $this->assertEquals($now + 3600, CookieCollectionSingleton::getInstance()->get($this->getUser()->identityCookie['name'])->expire);
-    }
-
-    public function testLoginByCookieOkNoExpiration()
-    {
-        $now = time();
-        $this->getUser()->autoRenewCookie = false;
-        $this->assertTrue($this->getUser()->isGuest);
-        $this->setToken(false, [$now, $now, 0, 'jti', 'iss', $this->getAudience()]);
-        $this->invokeInaccessibleMethod($this->getUser(), 'loginByCookie');
-        $this->assertFalse($this->getUser()->isGuest);
-        $this->assertEquals(0, CookieCollectionSingleton::getInstance()->get($this->getUser()->identityCookie['name'])->expire);
-    }
-
-    public function testLoginByCookieNotFound()
-    {
-        $this->invokeInaccessibleMethod($this->getUser(), 'loginByCookie');
-        $this->assertTrue($this->getUser()->isGuest);
-
-        $now = time();
-        $this->getUser()->autoRenewCookie = false;
-        $this->assertTrue($this->getUser()->isGuest);
-        $this->setToken(false, [$now, $now, $now + 3600, 'notFound', 'iss', $this->getAudience()]);
-        $this->invokeInaccessibleMethod($this->getUser(), 'loginByCookie');
-        $this->assertTrue($this->getUser()->isGuest);
+        return $claims;
     }
 
     /**
-     * @expectedException \yii\base\InvalidValueException
+     * @covers ::getIdentityAndDurationFromCookie
+     * @dataProvider claimsProvider
      */
-    public function testLoginByCookieError()
+    public function testGetIdentityAndDurationFromCookie(
+        $success,
+        array $config,
+        $key,
+        $testKey,
+        $issuedAt,
+        $notBefore,
+        $expiresAt,
+        $id,
+        $testId,
+        $issuer,
+        $testIssuer,
+        $audience,
+        $testAudience
+    )
     {
+        $set = json_encode(func_get_args());
+        if (in_array($set, static::$successfulSets, true)) {
+            $success = true;
+        }
+
         $now = time();
-        $this->getUser()->autoRenewCookie = false;
-        $this->assertTrue($this->getUser()->isGuest);
-        $this->setToken(false, [$now, $now, $now + 3600, 'error', 'iss', $this->getAudience()]);
-        $this->invokeInaccessibleMethod($this->getUser(), 'loginByCookie');
+        $this->bootApplication(['components' => ['user' => array_merge($config, [
+            'key' => $testKey,
+            'issuer' => $testIssuer,
+            'audience' => $testAudience,
+        ])]]);
+        $this->sendReferenceTokenAndGetClaims($now, $key, $issuedAt, $notBefore, $expiresAt, $id, $issuer, $audience);
+        TestIdentity::$authKeys[$id] = substr($testId, 4);
+        TestGlobals::$time = $now + 60;
+        $result = $this->invokeInaccessibleMethod($this->getUser(), 'getIdentityAndDurationFromCookie');
+        if ($success) {
+            $this->assertSame(substr($testId, 4), $result['identity']->authKey);
+            $this->assertSame($expiresAt - $notBefore, $result['duration']);
+        } else {
+            $this->assertNull($result);
+        }
     }
 
-    public function testRenewIdentityCookie()
+    /**
+     * @dataProvider claimsProvider
+     */
+    public function testGetIdentityAndTokenFromCookie(
+        $success,
+        array $config,
+        $key,
+        $testKey,
+        $issuedAt,
+        $notBefore,
+        $expiresAt,
+        $id,
+        $testId,
+        $issuer,
+        $testIssuer,
+        $audience,
+        $testAudience
+    )
     {
-        $this->invokeInaccessibleMethod($this->getUser(), 'renewIdentityCookie');
-        $this->assertEquals(0, CookieCollectionSingleton::getInstance()->count);
+        $set = json_encode(func_get_args());
+        if (in_array($set, static::$successfulSets, true)) {
+            $success = true;
+        }
 
         $now = time();
-        $this->invokeInaccessibleMethod($this->getUser(), 'sendIdentityCookie', [new TestIdentity(), 60]);
-        $this->assertTrue(CookieCollectionSingleton::getInstance()->has($this->getUser()->identityCookie['name']));
-        sleep(1);
-        $this->invokeInaccessibleMethod($this->getUser(), 'renewIdentityCookie');
-        $this->assertGreaterThan($now + 60, CookieCollectionSingleton::getInstance()->get($this->getUser()->identityCookie['name'])->expire);
+        $this->bootApplication(['components' => ['user' => array_merge($config, [
+            'key' => $testKey,
+            'issuer' => $testIssuer,
+            'audience' => $testAudience,
+        ])]]);
+        $claims = $this->sendReferenceTokenAndGetClaims($now, $key, $issuedAt, $notBefore, $expiresAt, $id, $issuer, $audience);
+        TestIdentity::$authKeys[$id] = substr($testId, 4);
+        TestGlobals::$time = $now + 60;
+        try {
+            $result = $this->invokeInaccessibleMethod($this->getUser(), 'getIdentityAndTokenFromCookie');
+        } catch (\Exception $e) {
+            $result = null;
+        }
+        if ($success) {
+            /** @var TestIdentity $identity */
+            /** @var Token $token */
+            list($identity, $token) = $result;
+            $this->assertSame(substr($testId, 4), $identity->authKey);
+            $this->assertEquals($claims, $this->getClaimsFromToken($token));
+        } else {
+            $this->assertNull($result);
+        }
     }
 
-    public function testSendIdentityCookie()
+    public function loginProvider()
+    {
+        $configs = [
+            [[
+                'useAuthKey' => false,
+                'appendAuthKey' => false,
+            ]],
+            [[
+                'useAuthKey' => true,
+                'appendAuthKey' => false,
+            ]],
+            [[
+                'useAuthKey' => true,
+                'appendAuthKey' => true,
+            ]],
+        ];
+        $keys = [
+            [true, 'foo', 'foo'],
+            [false, 'foo', 'bar'],
+        ];
+        $durations = [
+            [0],
+            [1],
+            [59],
+            [3600],
+        ];
+        $jtis = [
+            ['jti_foo'],
+            ['jti_bar'],
+        ];
+        $issuerClosure = function () {
+            return 'iss';
+        };
+        $issuers = [
+            ['iss', 'iss'],
+            ['iss', $issuerClosure],
+            ['http://example.com', null],
+        ];
+        $audienceClosure = function () {
+            return 'aud';
+        };
+        $audiences = [
+            ['aud', 'aud'],
+            ['aud', $audienceClosure],
+            ['http://example.com', null],
+        ];
+        $claims = [[]];
+        foreach ([$configs, $keys, $durations, $jtis, $issuers, $audiences] as $sets) {
+            $newClaims = [];
+            foreach ($claims as $claim) {
+                $valid = array_shift($claim);
+                foreach ($sets as $set) {
+                    $setValid = is_bool($set[0]) ? array_shift($set) : true;
+                    $newValid = ($valid !== null ? $valid : true) && $setValid;
+                    $newClaim = array_merge([$newValid], $claim, $set);
+                    $newClaims[json_encode($newClaim)] = $newClaim;
+                }
+            }
+            $claims = $newClaims;
+        }
+        return $claims;
+    }
+
+    /**
+     * @covers ::sendIdentityCookie
+     * @covers ::renewIdentityCookie
+     * @dataProvider loginProvider
+     */
+    public function testSendAndRenewIdentityCookie(
+        $success,
+        array $config,
+        $key,
+        $renewKey,
+        $duration,
+        $id,
+        $expectedIssuer,
+        $issuer,
+        $expectedAudience,
+        $audience
+    )
     {
         $now = time();
-        $this->invokeInaccessibleMethod($this->getUser(), 'sendIdentityCookie', [new TestIdentity(), 60]);
-        $this->assertGreaterThanOrEqual($now + 60, CookieCollectionSingleton::getInstance()->get($this->getUser()->identityCookie['name'])->expire);
+        $this->bootApplication(['components' => ['user' => array_merge($config, [
+            'key' => $key,
+            'issuer' => $issuer,
+            'audience' => $audience,
+        ])]]);
+        TestGlobals::$time = $now;
+        $identity = TestIdentity::findIdentity($id);
+        $this->invokeInaccessibleMethod($this->getUser(), 'sendIdentityCookie', [$identity, $duration]);
+        $referenceClaims = [
+            'iat' => $now,
+            'nbf' => $now,
+            'exp' => $now + $duration,
+            'jti' => $id,
+            'iss' => $expectedIssuer,
+            'aud' => $expectedAudience,
+        ];
+        if ($duration === 0) {
+            unset($referenceClaims['exp']);
+        }
+        if ($this->getUser()->useAuthKey) {
+            $authKey = substr($id, 4);
+            if ($this->getUser()->appendAuthKey) {
+                $key .= $authKey;
+            } else {
+                $referenceClaims['authKey'] = $authKey;
+            }
+        }
+        $this->assertEquals($referenceClaims, $this->getReferenceClaims($now, $key));
 
-        CookieCollectionSingleton::getInstance()->removeAll();
-        $this->invokeInaccessibleMethod($this->getUser(), 'sendIdentityCookie', [new TestIdentity(), 0]);
-        $this->assertEquals(0, CookieCollectionSingleton::getInstance()->get($this->getUser()->identityCookie['name'])->expire);
+        $now += $duration > 0 ? $duration - 1 : 0;
+        TestGlobals::$time = $now;
+        $oldReferenceClaims = $referenceClaims;
+        $referenceClaims['nbf'] = $now;
+        if ($duration > 0) {
+            $referenceClaims['exp'] = $now + $duration;
+        }
+        $this->getUser()->key = $renewKey;
+        $this->invokeInaccessibleMethod($this->getUser(), 'renewIdentityCookie');
+        $claims = $this->getReferenceClaims($now, $key);
+        if ($success) {
+            $this->assertEquals($referenceClaims, $claims);
+        } else {
+            $this->assertEquals($oldReferenceClaims, $claims);
+        }
     }
 
     /**
@@ -184,82 +323,91 @@ class UserTest extends TestCase
     }
 
     /**
-     * @return string
-     */
-    protected function getAudience()
-    {
-        return $this->invokeInaccessibleMethod($this->getUser(), 'getAudience');
-    }
-
-    /**
-     * @param $reference
      * @param int $currentTime
-     * @param string $audience
-     * @return array|false
+     * @param string $key
+     * @return array
      */
-    protected function getTokenClaims($reference, $currentTime = null, $audience = null)
+    protected function getReferenceClaims($currentTime, $key)
     {
-        if (!$reference) {
-            return $this->invokeInaccessibleMethod($this->getUser(), 'getTokenClaims', [$currentTime, $audience]);
-        }
-
         JWT::$timestamp = $currentTime;
-        try {
-            return (array) JWT::decode(
-                \Yii::$app->request->cookies->getValue($this->getUser()->identityCookie['name']),
-                $this->getUser()->token,
-                ['HS256']
-            );
-        } catch (\Exception $e) {
-            JWT::$timestamp = null;
-        }
-        \Yii::$app->getResponse()->getCookies()->remove(new Cookie($this->getUser()->identityCookie));
-        return false;
+        return (array) JWT::decode(
+            \Yii::$app->request->cookies->getValue($this->getUser()->identityCookie['name']),
+            $key,
+            ['HS256']
+        );
     }
 
-    /**
-     * @param bool $reference
-     * @param array $params
-     */
-    protected function setToken($reference, array $params)
+    protected function sendReferenceTokenAndGetClaims(
+        $currentTime,
+        $key,
+        $issuedAt,
+        $notBefore,
+        $expiresAt,
+        $id,
+        $issuer,
+        $audience
+    )
     {
-        list($issuedAt, $notBefore, $expiresAt, $id, $issuer, $audience) = $params;
-        if (!$reference) {
-            $this->invokeInaccessibleMethod($this->getUser(), 'setToken', [
-                $issuedAt, $notBefore, $expiresAt, $id, $issuer, $audience,
-            ]);
-        }
-
-        $cookie = new Cookie($this->getUser()->identityCookie);
-        $token = [
+        $issuedAt += $currentTime;
+        $notBefore += $currentTime;
+        $expiresAt += $currentTime;
+        $claims = [
             'iat' => $issuedAt,
             'nbf' => $notBefore,
+            'exp' => $expiresAt,
             'jti' => $id,
             'iss' => $issuer,
             'aud' => $audience,
         ];
-        if ($expiresAt > 0) {
-            $token['exp'] = $expiresAt;
-            $cookie->expire = $expiresAt;
+        if ($this->getUser()->useAuthKey) {
+            $authKey = substr($id, 4);
+            if ($this->getUser()->appendAuthKey) {
+                $key .= $authKey;
+            } else {
+                $claims['authKey'] = $authKey;
+            }
         }
-        $cookie->value = JWT::encode($token, $this->getUser()->token, 'HS256');
+        $this->sendReferenceToken($claims, $key);
+        return $claims;
+    }
+
+    protected function sendReferenceToken(array $claims, $key)
+    {
+        $cookie = new Cookie($this->getUser()->identityCookie);
+        $cookie->expire = $claims['exp'];
+        $cookie->value = JWT::encode($claims, $key, 'HS256');
         \Yii::$app->getResponse()->getCookies()->add($cookie);
     }
 
-    /**
-     * @param array $token
-     * @param int $index
-     * @return array
-     */
-    protected function prepareTestToken(array $token, $index)
+    protected function getClaimsFromToken(Token $token)
     {
-        $newToken = [];
-        foreach ($token as $value) {
-            if (is_array($value)) {
-                $value = $value[$index];
-            }
-            $newToken[] = $value;
+        $claims = [];
+        foreach (array_keys($token->getClaims()) as $name) {
+            $claims[$name] = $token->getClaim($name);
         }
-        return $newToken;
+        return $claims;
+    }
+
+    protected function bootApplication(array $config = [])
+    {
+        TestGlobals::$time = null;
+        TestIdentity::$authKeys = null;
+        TestCookieCollection::getInstance()->removeAll();
+        $this->createWebApplication(ArrayHelper::merge([
+            'components' => [
+                'user' => [
+                    'class' => User::className(),
+                    'identityClass' => TestIdentity::className(),
+                    'key' => 'foobar',
+                    'enableAutoLogin' => true,
+                ],
+                'request' => [
+                    'class' => TestRequest::className(),
+                ],
+                'response' => [
+                    'class' => TestResponse::className(),
+                ],
+            ],
+        ], $config));
     }
 }
