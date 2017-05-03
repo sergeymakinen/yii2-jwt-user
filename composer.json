@@ -18,12 +18,12 @@
     ],
     "minimum-stability": "dev",
     "require": {
-        "php": ">=5.5",
-        "yiisoft/yii2": "~2.0.2",
+        "php": "^5.5 || ^7.0",
+        "yiisoft/yii2": "~2.0.9",
         "lcobucci/jwt": "~3.2.0"
     },
     "require-dev": {
-        "sergeymakinen/yii2-tests": "^2.0",
+        "sergeymakinen/yii2-tests": "^2.1.1",
         "firebase/php-jwt": "^4.0"
     },
     "autoload": {

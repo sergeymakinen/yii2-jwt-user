@@ -11,6 +11,6 @@ class TestResponse extends Response
      */
     public function getCookies()
     {
-        return CookieCollectionSingleton::getInstance();
+        return TestCookieCollection::getInstance();
     }
 }

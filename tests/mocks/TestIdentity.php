@@ -9,17 +9,42 @@ use yii\web\IdentityInterface;
 class TestIdentity extends Object implements IdentityInterface
 {
     /**
+     * @var string[]
+     */
+    public static $authKeys;
+
+    /**
+     * @var string
+     */
+    public $id;
+
+    /**
+     * @var string
+     */
+    public $authKey;
+
+    /**
      * @inheritDoc
      */
     public static function findIdentity($id)
     {
-        if ($id === 'jti') {
-            return new self();
-        } elseif ($id === 'error') {
-            return new \stdClass();
-        } else {
-            return null;
+        if (strpos($id, 'jti_') === 0) {
+            if (isset(self::$authKeys[$id])) {
+                $authKey = self::$authKeys[$id];
+            } else {
+                $authKey = substr($id, 4);
+            }
+            return new self([
+                'id' => $id,
+                'authKey' => $authKey,
+            ]);
         }
+
+        if ($id === 'error') {
+            return new \stdClass();
+        }
+
+        return null;
     }
 
     /**
@@ -35,7 +60,7 @@ class TestIdentity extends Object implements IdentityInterface
      */
     public function getId()
     {
-        return 'jti';
+        return $this->id;
     }
 
     /**
@@ -43,7 +68,7 @@ class TestIdentity extends Object implements IdentityInterface
      */
     public function getAuthKey()
     {
-        throw new InvalidCallException('Mocked');
+        return $this->authKey;
     }
 
     /**
@@ -51,6 +76,6 @@ class TestIdentity extends Object implements IdentityInterface
      */
     public function validateAuthKey($authKey)
     {
-        throw new InvalidCallException('Mocked');
+        return $this->authKey === $authKey;
     }
 }

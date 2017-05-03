@@ -3,7 +3,7 @@
  * JWT powered User for Yii 2
  *
  * @see       https://github.com/sergeymakinen/yii2-jwt-user
- * @copyright Copyright (c) 2016 Sergey Makinen (https://makinen.ru)
+ * @copyright Copyright (c) 2016-2017 Sergey Makinen (https://makinen.ru)
  * @license   https://github.com/sergeymakinen/yii2-jwt-user/blob/master/LICENSE MIT License
  */
 
@@ -12,6 +12,7 @@ namespace sergeymakinen\yii\jwtuser;
 use Lcobucci\JWT\Builder;
 use Lcobucci\JWT\Parser;
 use Lcobucci\JWT\Signer\Hmac\Sha256;
+use Lcobucci\JWT\Token;
 use Lcobucci\JWT\ValidationData;
 use yii\base\InvalidValueException;
 use yii\web\Cookie;
@@ -29,8 +30,21 @@ class User extends \yii\web\User
     /**
      * @var string JWT sign key. Must be random and secret.
      * @see https://tools.ietf.org/html/rfc7519#section-11
+     * @since 3.0
      */
-    public $token;
+    public $key;
+
+    /**
+     * @var bool whether to use a [[IdentityInterface::getAuthKey()]] value to validate a token.
+     * @since 3.0
+     */
+    public $useAuthKey = true;
+
+    /**
+     * @var bool whether to append a [[IdentityInterface::getAuthKey()]] value to the sign key or store it as a claim.
+     * @since 3.0
+     */
+    public $appendAuthKey = false;
 
     /**
      * @var \Closure|string JWT audience claim ("aud").
@@ -40,51 +54,38 @@ class User extends \yii\web\User
     public $audience;
 
     /**
-     * @inheritDoc
+     * @var \Closure|string JWT issuer claim ("iss").
+     * @see https://tools.ietf.org/html/rfc7519#section-4.1.1
+     * @since 3.0
      */
-    protected function loginByCookie()
-    {
-        $claims = $this->getTokenClaims();
-        if ($claims === false) {
-            return;
-        }
-
-        /** @var IdentityInterface $class */
-        $class = $this->identityClass;
-        $identity = $class::findIdentity($claims['jti']);
-        if (!isset($identity)) {
-            return;
-        } elseif (!$identity instanceof IdentityInterface) {
-            throw new InvalidValueException("$class::findIdentity() must return an object implementing IdentityInterface.");
-        }
-
-        if (isset($claims['exp'])) {
-            $duration = $claims['exp'] - $claims['nbf'];
-        } else {
-            $duration = 0;
-        }
-        if ($this->beforeLogin($identity, true, $duration)) {
-            $this->switchIdentity($identity, $this->autoRenewCookie ? $duration : 0);
-            $id = $claims['jti'];
-            $ip = \Yii::$app->getRequest()->getUserIP();
-            \Yii::info("User '{$id}' logged in from {$ip} via the JWT cookie.", __METHOD__);
-            $this->afterLogin($identity, true, $duration);
-        }
-    }
+    public $issuer;
 
     /**
      * @inheritDoc
      */
     protected function renewIdentityCookie()
     {
-        $claims = $this->getTokenClaims();
-        if ($claims === false) {
+        try {
+            /** @var IdentityInterface $identity */
+            /** @var Token $token */
+            list($identity, $token) = $this->getIdentityAndTokenFromCookie();
+            if ($identity === null) {
+                return;
+            }
+        } catch (\Exception $e) {
+            if ($e instanceof InvalidValueException) {
+                throw $e;
+            }
+
             return;
         }
-
         $now = time();
-        $expiresAt = $now + ($claims['exp'] - $claims['nbf']);
-        $this->setToken($claims['iat'], $now, $expiresAt, $claims['jti'], $claims['iss'], $claims['aud']);
+        $builder = $this->createBuilderFromToken($token)
+            ->setNotBefore($now);
+        if ($token->hasClaim('exp')) {
+            $builder->setExpiration($now + ($token->getClaim('exp') - $token->getClaim('nbf')));
+        }
+        $this->sendToken($builder, $identity);
     }
 
     /**
@@ -93,107 +94,203 @@ class User extends \yii\web\User
     protected function sendIdentityCookie($identity, $duration)
     {
         $now = time();
+        $builder = (new Builder())
+            ->setIssuedAt($now)
+            ->setNotBefore($now)
+            ->setId($identity->getId());
         if ($duration > 0) {
-            $expiresAt = $now + $duration;
-        } else {
-            $expiresAt = 0;
+            $builder->setExpiration($now + $duration);
         }
-        $this->setToken($now, $now, $expiresAt, $identity->getId());
+        $issuer = $this->getPrincipal($this->issuer);
+        if ($issuer !== null) {
+            $builder->setIssuer($issuer);
+        }
+        $audience = $this->getPrincipal($this->audience);
+        if ($audience !== null) {
+            $builder->setAudience($audience);
+        }
+        if ($this->useAuthKey && !$this->appendAuthKey) {
+            $builder->set('authKey', $identity->getAuthKey());
+        }
+        $this->sendToken($builder, $identity);
     }
 
     /**
-     * Tries to read, verify, validate and return a JWT claims stored in the identity cookie.
-     * @param int $currentTime
-     * @param string $audience
-     * @return array|false
-     * @since 1.1
+     * @inheritDoc
      */
-    protected function getTokenClaims($currentTime = null, $audience = null)
+    protected function getIdentityAndDurationFromCookie()
     {
-        $jwt = \Yii::$app->getRequest()->getCookies()->getValue($this->identityCookie['name']);
-        if (!isset($jwt)) {
-            return false;
-        }
-
         try {
-            $token = (new Parser())->parse($jwt);
-            if (!$token->verify(new Sha256(), $this->token)) {
-                throw new InvalidValueException('Invalid signature');
+            /** @var IdentityInterface $identity */
+            /** @var Token $token */
+            list($identity, $token) = $this->getIdentityAndTokenFromCookie();
+        } catch (\Exception $e) {
+            if ($e instanceof InvalidValueException) {
+                throw $e;
             }
 
-            if (!$token->validate($this->initClaims(new ValidationData($currentTime), null, $audience))) {
-                throw new InvalidValueException('Invalid claims');
-            }
-            $claims = [];
-            foreach (array_keys($token->getClaims()) as $name) {
-                $claims[$name] = $token->getClaim($name);
-            }
-            return $claims;
-        } catch (\Exception $e) {
-            $error = $e->getMessage();
+            $ip = \Yii::$app->getRequest()->getUserIP();
+            $error = lcfirst($e->getMessage());
+            \Yii::warning("Invalid JWT cookie from $ip: $error", __METHOD__);
+            $this->removeIdentityCookie();
+            return null;
         }
-        $ip = \Yii::$app->getRequest()->getUserIP();
-        \Yii::warning("Invalid JWT cookie from {$ip}: {$error}.", __METHOD__);
-        \Yii::$app->getResponse()->getCookies()->remove(new Cookie($this->identityCookie));
-        return false;
+        if ($identity === null) {
+            $this->removeIdentityCookie();
+            return null;
+        }
+
+        return ['identity' => $identity, 'duration' => $token->hasClaim('exp') ? $token->getClaim('exp') - $token->getClaim('nbf') : 0];
     }
 
     /**
-     * Writes a JWT token into the identity cookie.
-     * @param int $issuedAt
-     * @param int $notBefore
-     * @param int $expiresAt
-     * @param mixed $id
-     * @param string $issuer
-     * @param string $audience
-     * @since 1.1
+     * @return array|null
      */
-    protected function setToken($issuedAt, $notBefore, $expiresAt, $id, $issuer = null, $audience = null)
+    private function getIdentityAndTokenFromCookie()
     {
-        $builder = $this->initClaims(new Builder(), $issuer, $audience)
-            ->setIssuedAt($issuedAt)
-            ->setNotBefore($notBefore)
-            ->setId($id);
-        $cookie = new Cookie($this->identityCookie);
-        if ($expiresAt > 0) {
-            $builder->setExpiration($expiresAt);
-            $cookie->expire = $expiresAt;
+        $value = \Yii::$app->getRequest()->getCookies()->getValue($this->identityCookie['name']);
+        if ($value === null) {
+            return null;
         }
+
+        $token = (new Parser())->parse($value);
+        if ($this->useAuthKey && $this->appendAuthKey) {
+            $identity = $this->getIdentityFromToken($token);
+            if ($identity === null) {
+                return null;
+            }
+
+            $this->assertSignature($token, $identity);
+            $this->assertClaims($token);
+        } else {
+            $this->assertSignature($token);
+            $this->assertClaims($token);
+            $identity = $this->getIdentityFromToken($token);
+            if ($identity === null) {
+                return null;
+            }
+        }
+        return [$identity, $token];
+    }
+
+    /**
+     * @param \Closure|string|null $value
+     * @return string|null
+     */
+    private function getPrincipal($value)
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if ($value instanceof \Closure) {
+            return $value();
+        }
+
+        return \Yii::$app->getRequest()->getHostInfo();
+    }
+
+    /**
+     * @param IdentityInterface|null $identity
+     * @return string
+     */
+    private function getKey(IdentityInterface $identity = null)
+    {
+        $key = (string) $this->key;
+        if ($this->useAuthKey && $this->appendAuthKey) {
+            $key .= $identity->getAuthKey();
+        }
+        if ($key === '') {
+            throw new InvalidValueException('Sign key cannot be empty.');
+        }
+
+        return $key;
+    }
+
+    /**
+     * @param Token $token
+     * @param IdentityInterface|null $identity
+     */
+    private function assertSignature(Token $token, IdentityInterface $identity = null)
+    {
+        $key = $identity === null ? $this->getKey() : $this->getKey($identity);
+        if (!$token->verify(new Sha256(), $key)) {
+            throw new \InvalidArgumentException('Invalid signature');
+        }
+    }
+
+    /**
+     * @param Token $token
+     */
+    private function assertClaims(Token $token)
+    {
+        $validationData = new ValidationData(time());
+        $issuer = $this->getPrincipal($this->issuer);
+        if ($issuer !== null) {
+            $validationData->setIssuer($issuer);
+        }
+        $audience = $this->getPrincipal($this->audience);
+        if ($audience !== null) {
+            $validationData->setAudience($audience);
+        }
+        if (!$token->validate($validationData)) {
+            throw new \InvalidArgumentException('Invalid claims');
+        }
+    }
+
+    /**
+     * @param Token $token
+     * @return IdentityInterface|null
+     */
+    private function getIdentityFromToken(Token $token)
+    {
+        /* @var $class IdentityInterface */
+        $class = $this->identityClass;
+        $id = $token->getClaim('jti');
+        $identity = $class::findIdentity($id);
+        if ($identity === null) {
+            return null;
+        }
+
+        if (!$identity instanceof IdentityInterface) {
+            throw new InvalidValueException("$class::findIdentity() must return an object implementing IdentityInterface.");
+        }
+
+        if ($this->useAuthKey && !$this->appendAuthKey) {
+            $authKey = $token->getClaim('authKey');
+            if (!$identity->validateAuthKey($authKey)) {
+                \Yii::warning("Invalid auth key attempted for user '$id': $authKey", __METHOD__);
+                return null;
+            }
+        }
+
+        return $identity;
+    }
+
+    /**
+     * @param Token $token
+     * @return Builder
+     */
+    private function createBuilderFromToken(Token $token)
+    {
+        $builder = new Builder();
+        foreach (array_keys($token->getClaims()) as $name) {
+            $builder->set($name, $token->getClaim($name));
+        }
+        return $builder;
+    }
+
+    /**
+     * @param Builder $builder
+     * @param IdentityInterface $identity
+     */
+    private function sendToken(Builder $builder, IdentityInterface $identity)
+    {
+        $cookie = new Cookie($this->identityCookie);
+        $cookie->expire = $builder->getToken()->getClaim('exp', '0');
         $cookie->value = (string) $builder
-            ->sign(new Sha256(), $this->token)
+            ->sign(new Sha256(), $this->getKey($identity))
             ->getToken();
         \Yii::$app->getResponse()->getCookies()->add($cookie);
-    }
-
-    /**
-     * Returns a JWT audience claim ("aud").
-     * @return string
-     * @since 1.1
-     */
-    protected function getAudience()
-    {
-        if (is_string($this->audience)) {
-            return $this->audience;
-        } elseif ($this->audience instanceof \Closure) {
-            return call_user_func($this->audience);
-        } else {
-            return \Yii::$app->getRequest()->getHostInfo();
-        }
-    }
-
-    /**
-     * Returns Builder/ValidationData with "iss" and "aud" claims set.
-     * @param Builder|ValidationData $object
-     * @param string $issuer
-     * @param string $audience
-     * @return Builder|ValidationData
-     */
-    private function initClaims($object, $issuer = null, $audience = null)
-    {
-        if ($object instanceof Builder) {
-            $object->setIssuer(isset($issuer) ? $issuer : \Yii::$app->getRequest()->getHostInfo());
-        }
-        $object->setAudience(isset($audience) ? $audience : $this->getAudience());
-        return $object;
     }
 }

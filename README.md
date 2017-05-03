@@ -13,13 +13,13 @@ The preferred way to install this extension is through [composer](https://getcom
 Either run
 
 ```bash
-composer require "sergeymakinen/yii2-jwt-user:^2.0"
+composer require "sergeymakinen/yii2-jwt-user:^3.0"
 ```
 
 or add
 
 ```json
-"sergeymakinen/yii2-jwt-user": "^2.0"
+"sergeymakinen/yii2-jwt-user": "^3.0"
 ```
 
 to the require section of your `composer.json` file.
@@ -35,12 +35,26 @@ Set the following Yii 2 configuration parameters:
             'class' => 'sergeymakinen\yii\jwtuser\User',
             'identityClass' => 'app\models\User',
             'enableAutoLogin' => true, // Optional
-            'token' => 'random key (CHANGE IT!)',
+            'key' => 'random sign key (CHANGE IT!)',
         ],
     ],
 ]
 ```
 
-Also set `identityClass` to whatever your identity class name is and change `token` to some *random* value and make sure it's *secret*.
+Also set `identityClass` to whatever your identity class name is. 
 
-That's it!
+**Don't forget**: set `key` to some *random* value and make sure it's *secret* and long enough.
+
+## Configuration
+
+You can choose between 3 different modes of sign key generation:
+
+| `$useAuthKey` value | `$appendAuthKey` value | Resulting key
+| --- | --- | ---
+| `false` | `false` | `sergeymakinen\yii\jwtuser\User::$key`
+| `true` | `false` | `yii\web\IdentityInterface::getAuthKey()`
+| `true` | `true` | `sergeymakinen\yii\jwtuser\User::$key`<br>concatenated with<br>`yii\web\IdentityInterface::getAuthKey()`
+
+Your choice depends on how you're going to use identities, revoke old/compromised keys.
+
+It's also possible to specify "audience" and "issuer" claims (and validate against them) via corresponding `$audience` and `$issuer` properties. They both may be either strings or `Closure` returning a string.
