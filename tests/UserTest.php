@@ -125,7 +125,9 @@ class UserTest extends TestCase
             'issuer' => $testIssuer,
             'audience' => $testAudience,
         ])]]);
-        $this->sendReferenceTokenAndGetClaims($now, $key, $issuedAt, $notBefore, $expiresAt, $id, $issuer, $audience);
+        $this->sendReferenceTokenAndGetClaims(
+            $now, $key, $issuedAt, $notBefore, $expiresAt, $id, $issuer, $audience
+        );
         TestIdentity::$authKeys[$id] = substr($testId, 4);
         TestGlobals::$time = $now + 60;
         $result = $this->invokeInaccessibleMethod($this->getUser(), 'getIdentityAndDurationFromCookie');
@@ -167,7 +169,9 @@ class UserTest extends TestCase
             'issuer' => $testIssuer,
             'audience' => $testAudience,
         ])]]);
-        $claims = $this->sendReferenceTokenAndGetClaims($now, $key, $issuedAt, $notBefore, $expiresAt, $id, $issuer, $audience);
+        $claims = $this->sendReferenceTokenAndGetClaims(
+            $now, $key, $issuedAt, $notBefore, $expiresAt, $id, $issuer, $audience
+        );
         TestIdentity::$authKeys[$id] = substr($testId, 4);
         TestGlobals::$time = $now + 60;
         try {
@@ -312,6 +316,70 @@ class UserTest extends TestCase
         } else {
             $this->assertEquals($oldReferenceClaims, $claims);
         }
+    }
+
+    public function testGetIdentityAndTokenFromCookieWithNoCookie()
+    {
+        $this->bootApplication();
+        $this->assertNull($this->invokeInaccessibleMethod($this->getUser(), 'getIdentityAndTokenFromCookie'));
+    }
+
+    public function testGetIdentityAndTokenFromCookieWithNoIdentity()
+    {
+        $this->bootApplication();
+        $issuer = \Yii::$app->getRequest()->getHostInfo();
+
+        $this->sendReferenceTokenAndGetClaims(time(), 'foobar', 0, 0, 60, 'non-existent', $issuer, $issuer);
+        $this->assertNull($this->invokeInaccessibleMethod($this->getUser(), 'getIdentityAndTokenFromCookie'));
+
+        $this->bootApplication([
+            'components' => [
+                'user' => [
+                    'useAuthKey' => true,
+                    'appendAuthKey' => true,
+                ],
+            ],
+        ]);
+        $this->sendReferenceTokenAndGetClaims(time(), 'foobar', 0, 0, 60, 'non-existent', $issuer, $issuer);
+        $this->assertNull($this->invokeInaccessibleMethod($this->getUser(), 'getIdentityAndTokenFromCookie'));
+    }
+
+    /**
+     * @expectedException \yii\base\InvalidValueException
+     */
+    public function testGetIdentityAndTokenFromCookieWithWrongIdentity()
+    {
+        $this->bootApplication();
+        $issuer = \Yii::$app->getRequest()->getHostInfo();
+        $this->sendReferenceTokenAndGetClaims(time(), 'foobar', 0, 0, 60, 'error', $issuer, $issuer);
+        $this->invokeInaccessibleMethod($this->getUser(), 'getIdentityAndTokenFromCookie');
+    }
+
+    public function methodNamesProvider()
+    {
+        return [
+            ['getIdentityAndTokenFromCookie'],
+            ['getIdentityAndDurationFromCookie'],
+            ['renewIdentityCookie'],
+        ];
+    }
+
+    /**
+     * @dataProvider methodNamesProvider
+     * @expectedException \yii\base\InvalidValueException
+     */
+    public function testGetIdentitiesWithNoKey($methodName)
+    {
+        $this->bootApplication([
+            'components' => [
+                'user' => [
+                    'key' => '',
+                ],
+            ],
+        ]);
+        $issuer = \Yii::$app->getRequest()->getHostInfo();
+        $this->sendReferenceTokenAndGetClaims(time(), 'foobar', 0, 0, 60, 'non-existent', $issuer, $issuer);
+        $this->invokeInaccessibleMethod($this->getUser(), $methodName);
     }
 
     /**
